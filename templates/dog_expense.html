@@ -1,0 +1,264 @@
+{% extends 'base.html' %}
+{% block title %}{{ dog.name }} · 狗狗记账{% endblock %}
+
+{% block content %}
+{% set active = 'expense' %}
+{% include '_header.html' %}
+
+{# ---------- 统计卡 ---------- #}
+<div class="row g-2 mb-3">
+  <div class="col-6 col-lg-3">
+    <div class="stat"><div class="v text-brand">¥{{ '%.0f'|format(summary.month) }}</div><div class="k">{{ summary.month_key }} 本月</div></div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat"><div class="v">¥{{ '%.0f'|format(summary.year) }}</div><div class="k">今年累计</div></div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat"><div class="v">¥{{ '%.0f'|format(summary.total) }}</div><div class="k">历史总计</div></div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat"><div class="v">{{ summary.count }}</div><div class="k">累计笔数</div></div>
+  </div>
+</div>
+
+<div class="row g-3 mb-3">
+  {# ---------- 分类饼图 ---------- #}
+  <div class="col-lg-5">
+    <div class="card h-100">
+      <div class="card-header">🍩 消费分类占比 <span class="sub">按金额</span></div>
+      <div class="card-body">
+        {% if summary.by_cat %}
+        <canvas id="catChart" height="200"></canvas>
+        <div class="mt-3">
+          {% set tsum = summary.total if summary.total else 1 %}
+          {% for c in summary.by_cat %}
+          <div class="d-flex justify-content-between align-items-center small py-1"
+               style="border-bottom:1px dashed var(--dp-line)">
+            <span><b>{{ c.category }}</b> <span class="text-muted">×{{ c.c }}</span></span>
+            <span>¥{{ '%.2f'|format(c.s or 0) }}
+              <span class="text-muted">（{{ '%.0f'|format((c.s or 0) / tsum * 100) }}%）</span>
+            </span>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-muted small py-5 text-center">还没有记账，先记第一笔</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {# ---------- 近12月柱状图 ---------- #}
+  <div class="col-lg-7">
+    <div class="card h-100">
+      <div class="card-header">📈 近 12 个月消费走势</div>
+      <div class="card-body">
+        <canvas id="monChart" height="150"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ---------- 操作条 + 筛选 ---------- #}
+<div class="card mb-3">
+  <div class="card-body py-2">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+      <div class="d-flex gap-2">
+        <button class="btn btn-brand btn-sm" data-bs-toggle="modal" data-bs-target="#exModal"
+                onclick="openExpenseNew()">＋ 记一笔</button>
+        <a class="btn btn-outline-brand btn-sm"
+           href="{{ url_for('dog_expense_csv', did=dog.id) }}">⬇ 导出 CSV</a>
+      </div>
+      <div class="small text-muted">
+        当前筛选合计 <b class="text-brand">¥{{ '%.2f'|format(fsum) }}</b> · {{ matched }} 笔
+      </div>
+    </div>
+    <form class="row g-2 align-items-end" method="get" action="{{ url_for('dog_expense', did=dog.id) }}">
+      <div class="col-6 col-md-2">
+        <label class="form-label mb-1">分类</label>
+        <select class="form-select form-select-sm" name="category">
+          <option value="">全部分类</option>
+          {% for name, tip in EXPENSE_CATS %}
+          <option value="{{ name }}" {{ 'selected' if name == cat }}>{{ name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label mb-1">从</label>
+        <input type="date" class="form-control form-control-sm" name="from" value="{{ d1 }}">
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label mb-1">到</label>
+        <input type="date" class="form-control form-control-sm" name="to" value="{{ d2 }}">
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label mb-1">关键词</label>
+        <input class="form-control form-control-sm" name="q" value="{{ kw }}" placeholder="项目 / 商家 / 备注">
+      </div>
+      <div class="col-md-3">
+        <button class="btn btn-outline-brand btn-sm">筛选</button>
+        <a class="btn btn-link btn-sm text-muted" href="{{ url_for('dog_expense', did=dog.id) }}">重置</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ---------- 明细表 ---------- #}
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0 align-middle">
+      <thead>
+        <tr><th>日期</th><th>分类</th><th>项目</th><th class="text-end">金额</th>
+          <th>数量</th><th>商家</th><th>支付</th><th>备注</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td class="text-nowrap">{{ r.day }}</td>
+          <td><span class="chip brand">{{ r.category }}</span></td>
+          <td>{{ r.item or '—' }}</td>
+          <td class="text-end fw-bold text-nowrap">¥{{ '%.2f'|format(r.amount or 0) }}</td>
+          <td class="text-nowrap small">{{ (r.qty|string + (r.unit or '')) if r.qty is not none else '—' }}</td>
+          <td class="small">{{ r.shop or '—' }}</td>
+          <td class="small">{{ r.pay_method or '—' }}</td>
+          <td class="small text-muted">{{ r.note or '' }}</td>
+          <td class="text-nowrap">
+            <button class="btn btn-sm btn-link text-brand p-0"
+                    data-ex='{{ {"id": r.id, "day": r.day, "category": r.category, "item": r.item or "", "amount": r.amount, "qty": r.qty, "unit": r.unit or "", "shop": r.shop or "", "pay_method": r.pay_method or "", "note": r.note or ""}|tojson }}'
+                    onclick="openExpenseEdit(this)">编辑</button>
+            <button class="btn btn-sm btn-link text-danger p-0 ms-1" onclick="delExpense({{ r.id }})">删除</button>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="9" class="text-center text-muted py-5">
+          还没有记账。点「＋ 记一笔」，把买狗粮、洗澡、打针的钱记下来，月底就知道养它花了多少。
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if pages > 1 %}
+{% set qf = {'category': cat, 'from': d1, 'to': d2, 'q': kw} %}
+<nav class="d-flex justify-content-center mt-3">
+  <ul class="pagination pagination-sm mb-0">
+    <li class="page-item {{ 'disabled' if page <= 1 }}">
+      <a class="page-link" href="{{ url_for('dog_expense', did=dog.id, page=page-1, **qf) }}">上一页</a>
+    </li>
+    <li class="page-item disabled"><span class="page-link">{{ page }} / {{ pages }}</span></li>
+    <li class="page-item {{ 'disabled' if page >= pages }}">
+      <a class="page-link" href="{{ url_for('dog_expense', did=dog.id, page=page+1, **qf) }}">下一页</a>
+    </li>
+  </ul>
+</nav>
+{% endif %}
+
+{# ---------- 新增 / 编辑弹窗 ---------- #}
+<div class="modal fade" id="exModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h6 class="modal-title" id="exTitle">＋ 记一笔</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="exId">
+        <input type="hidden" id="exDogId" value="{{ dog.id }}">
+        <div class="row g-2">
+          <div class="col-6">
+            <label class="form-label">日期</label>
+            <input type="date" class="form-control form-control-sm" id="exDay" value="{{ today }}">
+          </div>
+          <div class="col-6">
+            <label class="form-label">金额（元）<span class="req"></span></label>
+            <input type="number" step="0.01" min="0" class="form-control form-control-sm" id="exAmount" placeholder="0.00">
+          </div>
+          <div class="col-12">
+            <label class="form-label">分类 <span class="req"></span></label>
+            <select class="form-select form-select-sm" id="exCategory" onchange="exTip()">
+              {% for name, tip in EXPENSE_CATS %}
+              <option value="{{ name }}" data-tip="{{ tip }}">{{ name }}</option>
+              {% endfor %}
+            </select>
+            <div class="small text-muted mt-1" id="exTipBox"></div>
+          </div>
+          <div class="col-12">
+            <label class="form-label">项目</label>
+            <input class="form-control form-control-sm" id="exItem" placeholder="如：皇家幼犬粮 2kg / 洗澡 / 狂犬疫苗">
+          </div>
+          <div class="col-6">
+            <label class="form-label">数量</label>
+            <input type="number" step="0.01" class="form-control form-control-sm" id="exQty">
+          </div>
+          <div class="col-6">
+            <label class="form-label">单位</label>
+            <input class="form-control form-control-sm" id="exUnit" placeholder="袋 / 次 / 针">
+          </div>
+          <div class="col-6">
+            <label class="form-label">商家</label>
+            <input class="form-control form-control-sm" id="exShop" placeholder="店名 / 医院">
+          </div>
+          <div class="col-6">
+            <label class="form-label">支付方式</label>
+            <select class="form-select form-select-sm" id="exPay">
+              <option value="">—</option>
+              {% for p in PAY_METHODS %}
+              <option value="{{ p }}">{{ p }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-12">
+            <label class="form-label">备注</label>
+            <input class="form-control form-control-sm" id="exNote">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer py-2">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">取消</button>
+        <button class="btn btn-brand btn-sm" onclick="submitExpense()">保存</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if summary.by_cat %}
+<script>
+(function () {
+  var cats = {{ summary.by_cat|map(attribute='category')|list|tojson }};
+  var sums = {{ summary.by_cat|map(attribute='s')|list|tojson }};
+  var palette = ['#E07B39','#2C6E9B','#2E7D5B','#5B44A8','#C77700','#C0392B',
+                 '#8C7F73','#D08C3C','#4A8FA8','#7A6A3C','#B5651D','#9B7DB0'];
+  new Chart(document.getElementById('catChart'), {
+    type: 'doughnut',
+    data: { labels: cats,
+            datasets: [{ data: sums, backgroundColor: palette, borderWidth: 2, borderColor: '#fff' }] },
+    options: { responsive: true, plugins: {
+      legend: { position: 'right', labels: { boxWidth: 12, font: { size: 11 } } },
+      tooltip: { callbacks: { label: function (c) { return c.label + '：¥' + Number(c.parsed).toFixed(2); } } }
+    } }
+  });
+})();
+</script>
+{% endif %}
+<script>
+(function () {
+  var labels = {{ summary.months|map(attribute='m')|list|tojson }};
+  var vals = {{ summary.months|map(attribute='s')|list|tojson }};
+  new Chart(document.getElementById('monChart'), {
+    type: 'bar',
+    data: { labels: labels,
+            datasets: [{ label: '月消费（元）', data: vals, backgroundColor: '#E07B39',
+                         borderRadius: 5, maxBarThickness: 34 }] },
+    options: { responsive: true,
+      plugins: { legend: { display: false },
+                 tooltip: { callbacks: { label: function (c) { return '¥' + Number(c.parsed.y).toFixed(2); } } } },
+      scales: { y: { beginAtZero: true, ticks: { font: { size: 11 } } },
+                x: { ticks: { font: { size: 10 } } } }
+    }
+  });
+})();
+</script>
+{% endblock %}

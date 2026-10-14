@@ -1,0 +1,155 @@
+{% extends 'base.html' %}
+{% block title %}{{ dog.name }} · 记录管理{% endblock %}
+
+{% macro evtext(e) %}
+{%- if e.type == 'feed' -%}
+投喂 {{ e.data.get('amount') if e.data.get('amount') is not none else '—' }} g ／ 吃完 {{ e.data.get('eaten') if e.data.get('eaten') is not none else '—' }} g{% if e.data.get('food') %} ／ {{ e.data.get('food') }}{% endif %}{% if e.data.get('snack') %} ／ 零食：{{ e.data.get('snack') }}{% endif %}{% if e.data.get('supplement') %} ／ 补剂：{{ e.data.get('supplement') }}{% endif %}
+{%- elif e.type == 'potty' -%}
+{{ e.data.get('kind') or '—' }} ／ {% if e.data.get('success') %}<span class="chip ok">✅ 定点成功</span>{% else %}<span class="chip danger">❌ 未成功</span>{% endif %}{% if e.data.get('score') %} ／ 评分 {{ e.data.get('score') }}{% endif %}{% if e.data.get('blood') %} ／ <span class="text-danger fw-bold">带血❗</span>{% endif %}{% if e.data.get('location') %} ／ {{ e.data.get('location') }}{% endif %}{% if e.data.get('trigger') %} ／ 触发：{{ e.data.get('trigger') }}{% endif %}
+{%- elif e.type == 'train' -%}
+{% set s = e.data.get('success',0) %}{% set t = e.data.get('total',0) %}{% set r = (s/t*100)|round if t else 0 %}
+<b>{{ e.data.get('command') or '—' }}</b> ／ <span class="chip {{ 'ok' if r>=80 else ('warn' if r>=50 else 'danger') }}">{{ s }}/{{ t }}（{{ r }}%）</span>{% if e.data.get('minutes') %} ／ {{ e.data.get('minutes') }} 分钟{% endif %}{% if e.data.get('env') %} ／ {{ e.data.get('env') }}{% endif %}{% if e.data.get('distraction') %} ／ 干扰 {{ e.data.get('distraction') }}{% endif %}{% if e.data.get('reward') %} ／ 奖励：{{ e.data.get('reward') }}{% endif %}{% if e.data.get('adjust') %} ／ 下次：{{ e.data.get('adjust') }}{% endif %}
+{%- elif e.type == 'weight' -%}
+{{ e.data.get('kg') or '—' }} kg
+{%- elif e.type == 'water' -%}
+{{ e.data.get('ml') or '—' }} ml
+{%- else -%}
+{{ e.data.get('text') or '—' }}
+{%- endif -%}
+{% endmacro %}
+
+{% block content %}
+{% set active = 'records' %}
+{% include '_header.html' %}
+
+<!-- ============ 筛选 ============ -->
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span>📒 记录管理 <span class="sub">打卡 / 编辑 / 删除，数据存在本机服务器</span></span>
+    <div class="d-flex gap-1">
+      <button class="btn btn-sm btn-outline-brand" data-kind="feed" data-day="{{ today }}" onclick="openCheckin(this)">🍚 喂食</button>
+      <button class="btn btn-sm btn-outline-brand" data-kind="potty" data-day="{{ today }}" onclick="openCheckin(this)">💩 排泄</button>
+      <button class="btn btn-sm btn-outline-brand" data-kind="train" data-day="{{ today }}" onclick="openCheckin(this)">🎾 训练</button>
+      <button class="btn btn-sm btn-outline-brand" data-kind="weight" data-day="{{ today }}" onclick="openCheckin(this)">⚖️ 体重</button>
+    </div>
+  </div>
+  <div class="card-body py-3">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-6 col-md-2">
+        <label class="form-label">类型</label>
+        <select name="type" class="form-select form-select-sm">
+          <option value="">全部（{{ total }}）</option>
+          {% for t, lab in types %}
+          <option value="{{ t }}" {{ 'selected' if typ==t }}>{{ lab }}（{{ counts.get(t,0) }}）</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label">起始日期</label>
+        <input type="date" name="from" value="{{ d1 }}" class="form-control form-control-sm">
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label">结束日期</label>
+        <input type="date" name="to" value="{{ d2 }}" class="form-control form-control-sm">
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label">关键词（内容 / 备注）</label>
+        <input type="text" name="q" value="{{ kw }}" class="form-control form-control-sm" placeholder="如：鸡肉、糊状、坐">
+      </div>
+      <div class="col-12 col-md-3 d-flex gap-1">
+        <button class="btn btn-brand btn-sm flex-fill">查询</button>
+        <a href="{{ url_for('dog_records', did=dog.id) }}" class="btn btn-outline-secondary btn-sm">重置</a>
+      </div>
+    </form>
+
+    <div class="d-flex flex-wrap gap-1 mt-3">
+      <span class="sub me-1 align-self-center">快捷范围：</span>
+      <button type="button" class="btn btn-sm btn-outline-brand" onclick="setRange('today')">今天</button>
+      <button type="button" class="btn btn-sm btn-outline-brand" onclick="setRange('7')">近 7 天</button>
+      <button type="button" class="btn btn-sm btn-outline-brand" onclick="setRange('30')">近 30 天</button>
+      <a class="btn btn-sm btn-outline-brand" href="{{ url_for('dog_records', did=dog.id, type='train') }}">只看训练</a>
+      <a class="btn btn-sm btn-outline-brand" href="{{ url_for('dog_records', did=dog.id, type='feed') }}">只看喂食</a>
+      <a class="btn btn-sm btn-outline-brand" href="{{ url_for('dog_records', did=dog.id, type='potty') }}">只看排泄</a>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 列表 ============ -->
+<div class="card">
+  <div class="card-header d-flex justify-content-between">
+    <span>匹配 {{ matched }} 条{% if pages > 1 %} · 第 {{ page }}/{{ pages }} 页{% endif %}</span>
+    <span class="sub">最新在前 · 点「编辑」可改日期/时间/内容</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead>
+        <tr>
+          <th style="width:104px">日期</th>
+          <th style="width:70px">时间</th>
+          <th style="width:64px">类型</th>
+          <th>内容</th>
+          <th style="width:150px">备注</th>
+          <th style="width:96px"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in events %}
+        {% set ejson = {'id': e.id, 'type': e.type, 'day': e.day, 'time': e.time, 'note': e.note or '', 'data': e.data} %}
+        <tr>
+          <td class="text-nowrap">{{ e.day }}</td>
+          <td class="text-nowrap">{{ e.time or '—' }}</td>
+          <td><span class="tl-kind k-{{ e.type }}">{{ labels.get(e.type, e.type) }}</span></td>
+          <td class="small">{{ evtext(e) }}</td>
+          <td class="small text-muted">{{ e.note or '—' }}</td>
+          <td class="text-nowrap">
+            <button class="btn btn-sm btn-link text-brand p-0 px-1"
+                    data-event='{{ ejson|tojson }}' onclick="openEdit(this)">编辑</button>
+            <button class="btn btn-sm btn-link text-danger p-0 px-1" onclick="delEvent({{ e.id }})">删除</button>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-center text-muted py-5">
+          没有符合条件的记录。<br>
+          <span class="small">换个筛选条件，或点上方的按钮新增一条。</span>
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% set qf = {'type': typ, 'from': d1, 'to': d2, 'q': kw} %}
+  {% if pages > 1 %}
+  <div class="card-body py-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div class="sub">第 {{ page }} / {{ pages }} 页 · 共 {{ matched }} 条（每页 50）</div>
+    <div class="d-flex gap-1">
+      <a class="btn btn-sm btn-outline-brand {{ 'disabled' if page <= 1 }}"
+         href="{{ url_for('dog_records', did=dog.id, page=page-1, **qf) }}">← 上一页</a>
+      <a class="btn btn-sm btn-outline-brand {{ 'disabled' if page >= pages }}"
+         href="{{ url_for('dog_records', did=dog.id, page=page+1, **qf) }}">下一页 →</a>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+{% include '_checkin_modal.html' %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function setRange(mode) {
+  var f = document.querySelector('input[name="from"]');
+  var t = document.querySelector('input[name="to"]');
+  var d = new Date();
+  var iso = function (x) {   /* 用本地时间拼日期，toISOString 是 UTC 会差一天 */
+    return x.getFullYear() + '-' + ('0' + (x.getMonth() + 1)).slice(-2) + '-' + ('0' + x.getDate()).slice(-2);
+  };
+  if (mode === 'today') {
+    f.value = iso(d); t.value = iso(d);
+  } else {
+    var n = Number(mode);
+    var s = new Date(d.getTime() - (n - 1) * 86400000);
+    f.value = iso(s); t.value = iso(d);
+  }
+  f.form.submit();
+}
+</script>
+{% endblock %}

@@ -1,0 +1,144 @@
+{% extends 'base.html' %}
+{% block title %}{{ dog.name }} · 周报{% endblock %}
+
+{% block content %}
+{% set active = 'weekly' %}
+{% include '_header.html' %}
+
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div>
+    <h5 class="mb-0 fw-bold">📊 {{ stats.start }} ~ {{ stats.end }} 复盘</h5>
+    <div class="text-muted small">结论必须有数据支撑，问题只挑最严重的一个</div>
+  </div>
+  <div class="btn-group">
+    {% for d in [7, 14, 30] %}
+    <a href="{{ url_for('dog_weekly', did=dog.id, days=d) }}"
+       class="btn btn-sm {{ 'btn-brand' if stats.days==d else 'btn-outline-brand' }}">近 {{ d }} 天</a>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="card mb-3" style="border-left:5px solid {{ '#2E7D5B' if score and score>=80 else ('#C77700' if score and score>=60 else '#C0392B') }}">
+  <div class="card-body d-flex align-items-center gap-4 flex-wrap">
+    <div style="text-align:center">
+      <div style="font-size:2.6rem;font-weight:800;line-height:1;color:{{ '#2E7D5B' if score and score>=80 else ('#C77700' if score and score>=60 else '#C0392B') }}">
+        {{ score if score is not none else '—' }}
+      </div>
+      <div class="small text-muted">综合分</div>
+    </div>
+    <div class="flex-grow-1">
+      <h5 class="mb-1">【{{ verdict }}】</h5>
+      <div class="text-muted">{{ verdict_desc }}</div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-6 col-md-3">
+    <div class="stat">
+      <div class="v">{{ stats.train_rate if stats.train_rate is not none else '—' }}{% if stats.train_rate is not none %}%{% endif %}</div>
+      <div class="k">训练成功率（{{ stats.train_count }} 场）</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat">
+      <div class="v">{{ stats.potty_rate if stats.potty_rate is not none else '—' }}{% if stats.potty_rate is not none %}%{% endif %}</div>
+      <div class="k">定点排便成功率（{{ stats.potty_ok }}/{{ stats.potty_total }}）</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat">
+      <div class="v">{{ stats.avg_stool if stats.avg_stool is not none else '—' }}</div>
+      <div class="k">平均便便评分（3-4 理想）</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat">
+      <div class="v">{{ stats.feed_rate if stats.feed_rate is not none else '—' }}{% if stats.feed_rate is not none %}%{% endif %}</div>
+      <div class="k">进食达标率（{{ stats.feed_count }} 餐）</div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="card mb-3">
+      <div class="card-header">📈 每日训练成功率</div>
+      <div class="card-body"><canvas id="chartTrend" height="130"></canvas></div>
+    </div>
+    <div class="card mb-3">
+      <div class="card-header">⚖️ 体重变化</div>
+      <div class="card-body">
+        {% if stats.weights|length >= 2 %}
+        <div class="d-flex justify-content-between">
+          <div><div class="text-muted small">期初</div><div class="fw-bold">{{ stats.weights[0][1] }} kg</div><div class="small text-muted">{{ stats.weights[0][0] }}</div></div>
+          <div class="text-center align-self-center" style="font-size:1.6rem">→</div>
+          <div class="text-end"><div class="text-muted small">期末</div><div class="fw-bold">{{ stats.weights[-1][1] }} kg</div><div class="small text-muted">{{ stats.weights[-1][0] }}</div></div>
+        </div>
+        {% set diff = stats.weights[-1][1] - stats.weights[0][1] %}
+        <div class="mt-2 small">
+          变化：<b style="color:{{ 'var(--dp-ok)' if diff>0 else ('var(--dp-danger)' if diff<0 else 'inherit') }}">{{ '%+.1f'|format(diff) }} kg</b>
+          {% if stats.weights[0][1] > 0 %}
+          （{{ '%+.1f'|format(diff/stats.weights[0][1]*100) }}%）
+          {% endif %}
+        </div>
+        {% else %}
+        <div class="text-muted small text-center py-3">体重记录不足 2 条，无法看趋势</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="card mb-3">
+      <div class="card-header">✅ 下周计划 <span class="sub">最多 3 条</span></div>
+      <div class="card-body">
+        <ol class="mb-0 ps-3">
+          {% for t in tips %}<li class="mb-2">{{ t }}</li>{% endfor %}
+        </ol>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">🔔 健康提醒</div>
+      <div class="card-body py-2">
+        {% for a in alerts %}
+        <div class="alert-item {{ a.level }}">
+          <div class="t">{% if a.level == 'danger' %}❌{% else %}⚠️{% endif %} {{ a.title }}</div>
+          <div class="d">{{ a.detail }}</div>
+          <div class="a">👉 {{ a.action }}</div>
+        </div>
+        {% else %}
+        <div class="text-muted small py-3 text-center">✅ 暂无到期疫苗与异常预警</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function(){
+  var trend = {{ stats.trend|tojson }};
+  var el = document.getElementById('chartTrend');
+  if (!el) return;
+  new Chart(el, {
+    type: 'line',
+    data: {
+      labels: trend.map(function(t){ return t.day; }),
+      datasets: [{
+        data: trend.map(function(t){ return t.rate; }),
+        borderColor: '#E07B39', backgroundColor: 'rgba(224,123,57,.12)',
+        fill: true, tension: .3, spanGaps: true
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: { y: { min: 0, max: 100, ticks: { callback: function(v){ return v + '%'; } } } }
+    }
+  });
+})();
+</script>
+{% endblock %}

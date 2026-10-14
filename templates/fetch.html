@@ -1,0 +1,219 @@
+{% extends 'base.html' %}
+{% block title %}联网检索入库 · 狗狗管理平台{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div>
+    <h4 class="mb-0 fw-bold">🌐 联网检索入库</h4>
+    <div class="text-muted small">搜关键词 → 抓正文 → 提取候选 → 你点头才入库。系统不替你判断对错</div>
+  </div>
+  <a href="{{ url_for('knowledge_page') }}" class="btn btn-outline-brand btn-sm">回知识库</a>
+</div>
+
+{% if error %}<div class="alert alert-danger py-2">{{ error }}</div>{% endif %}
+{% if msg %}<div class="alert alert-success py-2">{{ msg }}</div>{% endif %}
+
+<div class="row g-3">
+  <div class="col-lg-8">
+
+    <!-- 搜索 -->
+    <div class="card mb-3">
+      <div class="card-header">① 检索</div>
+      <div class="card-body">
+        <form method="post" action="{{ url_for('fetch_search') }}" onsubmit="busy('正在检索…')">
+          <div class="row g-2">
+            <div class="col-md-7">
+              <input type="text" class="form-control form-control-sm" name="q"
+                     value="{{ query }}" placeholder="例：幼犬 疫苗 时间表　/　狗狗 禁忌食物" required>
+            </div>
+            <div class="col-md-3">
+              <select class="form-select form-select-sm" name="engine">
+                <option value="auto" {{ 'selected' if engine=='auto' }}>双引擎（推荐）</option>
+                <option value="bing" {{ 'selected' if engine=='bing' }}>仅 Bing</option>
+                <option value="baidu" {{ 'selected' if engine=='baidu' }}>仅百度</option>
+              </select>
+            </div>
+            <div class="col-md-2">
+              <button class="btn btn-brand btn-sm w-100">检索</button>
+            </div>
+          </div>
+        </form>
+        <hr class="my-3">
+        <form class="row g-2" method="post" action="{{ url_for('fetch_by_url') }}"
+              onsubmit="busy('正在抓取正文…')">
+          <div class="col-md-9">
+            <input type="url" class="form-control form-control-sm" name="url"
+                   placeholder="或者直接粘一个网址，例：https://www.kepuchina.cn/fkdwy/...">
+          </div>
+          <div class="col-md-3">
+            <button class="btn btn-outline-brand btn-sm w-100">直接抓这个网址</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- 搜索结果 -->
+    {% if rows %}
+    <form method="post" action="{{ url_for('fetch_extract') }}"
+          onsubmit="busy('正在抓取正文，最多 6 篇，可能要 20 秒…')">
+      <input type="hidden" name="query" value="{{ query }}">
+      <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between">
+          <span>② 搜索结果 <span class="sub">按信源可信度排序，勾选后抓正文</span></span>
+          <label class="sub"><input type="checkbox" onclick="toggleAll(this,'url')"> 全选可抓的</label>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-hover mb-0 align-middle">
+            <tbody>
+              {% for r in rows %}
+              <tr class="{{ 'text-muted' if r.blocked }}">
+                <td style="width:34px">
+                  <input type="checkbox" name="url" value="{{ r.url }}" {{ 'disabled' if r.blocked }}>
+                </td>
+                <td>
+                  <div class="fw-semibold small">{{ r.title or r.url }}</div>
+                  <div class="small text-muted" style="word-break:break-all">{{ r.url[:110] }}</div>
+                  {% if r.snippet %}<div class="small text-muted">{{ r.snippet[:160] }}</div>{% endif %}
+                </td>
+                <td style="width:96px" class="text-center">
+                  {% set lab = trust_label[r.trust] %}
+                  <span class="chip {{ lab[1] }}">{{ lab[0] }}</span>
+                  <div class="small text-muted">{{ r.engine }}</div>
+                </td>
+                <td style="width:52px" class="text-end">
+                  <span class="small text-muted">{{ r.score }}</span>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="card-body py-2 d-flex justify-content-between align-items-center">
+          <span class="small text-muted">
+            灰掉的是反爬站点（知乎/微信公众号/小红书等），系统抓不了，点标题自己去开
+          </span>
+          <button class="btn btn-brand btn-sm">抓取选中 → 提取候选</button>
+        </div>
+      </div>
+    </form>
+    {% endif %}
+
+    <!-- 抓取报告 -->
+    {% if report %}
+    <div class="card mb-3">
+      <div class="card-header">③ 抓取报告</div>
+      <div class="table-responsive">
+        <table class="table table-sm mb-0">
+          <tbody>
+            {% for x in report %}
+            <tr>
+              <td style="width:56px">
+                {% if x.ok %}<span class="chip ok">成功</span>{% else %}<span class="chip danger">失败</span>{% endif %}
+              </td>
+              <td class="small">{{ x.title or x.url[:60] }}</td>
+              <td style="width:70px" class="small text-muted">{{ x.paras }} 段</td>
+              <td class="small text-danger">{{ x.error[:70] }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- 候选条目 -->
+    {% if candidates %}
+    <form method="post" action="{{ url_for('fetch_save') }}">
+      <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between">
+          <span>④ 候选条目 <span class="sub">勾选后入库，入库的每条都带来源链接</span></span>
+          <label class="sub"><input type="checkbox" onclick="toggleAll(this,'idx')"> 全选</label>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-hover mb-0 align-middle">
+            <thead><tr><th style="width:34px"></th><th style="width:66px">分类</th><th>结论</th><th style="width:150px">来源</th></tr></thead>
+            <tbody>
+              {% for i, c in candidates %}
+              <tr>
+                <td><input type="checkbox" name="idx" value="{{ i }}" checked></td>
+                <td><span class="chip">{{ c.category }}</span></td>
+                <td>
+                  <div class="small">{{ c.conclusion }}</div>
+                  <div class="small text-muted">{{ c.topic }}　·　{{ c.article }}</div>
+                </td>
+                <td class="small">
+                  {% set lab = trust_label[c.trust] %}
+                  <span class="chip {{ lab[1] }}">{{ lab[0] }}</span>
+                  <div class="text-muted" style="word-break:break-all">{{ c.source }}</div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="card-body py-2 d-flex justify-content-between align-items-center">
+          <span class="small text-danger">⚠️ 入库前请扫一眼内容，写反了的别留</span>
+          <button class="btn btn-brand btn-sm">入库选中（重复自动跳过）</button>
+        </div>
+      </div>
+    </form>
+    {% endif %}
+
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card mb-3">
+      <div class="card-header">📖 信源分级规则</div>
+      <div class="card-body py-2 small">
+        {% for k, v in trust_label.items() %}
+        <div class="py-1" style="border-bottom:1px dashed var(--dp-line)">
+          <span class="chip {{ v[1] }}">{{ v[0] }}</span> <span class="text-muted">{{ v[2] }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-header">✅ 怎么用才靠谱</div>
+      <div class="card-body small">
+        <ol class="mb-0 ps-3">
+          <li>先用宽一点的关键词搜，比如「幼犬 疫苗」而不是一句话</li>
+          <li>优先勾<b>可信</b>和<b>中等</b>的，偏低的只用来看线索</li>
+          <li>同一件事最好有 2 个以上来源，说法不一致就别入库</li>
+          <li>抓不到正文的站（知乎等），自己打开看完手工入库</li>
+          <li>入库后再去知识库搜一遍，确认没重复</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">🔒 隐私与礼貌</div>
+      <div class="card-body small text-muted">
+        检索走的是公开搜索引擎页面，抓取带 0.4 秒间隔，一次最多 6 篇，不给对方站点添麻烦。
+        抓出来的内容只存在你本机数据库里。
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="overlay" style="display:none;position:fixed;inset:0;background:rgba(250,247,243,.86);z-index:2000;align-items:center;justify-content:center;flex-direction:column">
+  <div class="spinner-border" style="color:var(--dp-brand);width:3rem;height:3rem"></div>
+  <div class="mt-3 fw-semibold" id="overlayMsg">处理中…</div>
+  <div class="small text-muted mt-1">联网抓取比较慢，别刷新页面</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function busy(msg) {
+  document.getElementById('overlayMsg').textContent = msg || '处理中…';
+  var o = document.getElementById('overlay');
+  o.style.display = 'flex';
+}
+function toggleAll(box, name) {
+  document.querySelectorAll('input[name="' + name + '"]:not([disabled])').forEach(function (c) {
+    c.checked = box.checked;
+  });
+}
+</script>
+{% endblock %}

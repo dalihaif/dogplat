@@ -1,0 +1,41 @@
+{# ==================== 狗狗管理状态 · 改状态弹窗（全局共用） ====================
+   任意页面调用：data-dog='{"id":1,"name":"豆豆","status":"在养"}' onclick="openStatusModal(this)"
+   依赖上下文：DOG_STATUS、STATUS_TIP（由 context_processor 提供）
+#}
+<div class="modal fade" id="stModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h6 class="modal-title">改管理状态 · <span id="stDogName"></span></h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="stDogId">
+        <div class="mb-3">
+          <label class="form-label">当前状态</label>
+          <div class="fw-semibold" id="stCurrent">—</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">改为</label>
+          <select class="form-select form-select-sm" id="stNew">
+            {% for s in DOG_STATUS %}
+            <option value="{{ s }}">{{ s }} —— {{ STATUS_TIP.get(s, '') }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="mb-2">
+          <label class="form-label">变更说明</label>
+          <textarea class="form-control form-control-sm" id="stNote" rows="2"
+                    placeholder="如：2026-10-20 送给表姐家养；或：因病离世，已安葬"></textarea>
+          <div class="small text-muted mt-1">
+            状态真的变了才会留记录，会记下「原状态 → 新状态 + 说明 + 时间」，在「档案与免疫」页可查。
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer py-2">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">取消</button>
+        <button type="button" class="btn btn-brand btn-sm" onclick="submitStatus()">保存状态</button>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,172 @@
+{% extends 'base.html' %}
+{% block title %}知识库 · 狗狗管理平台{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div>
+    <h4 class="mb-0 fw-bold">📚 知识库</h4>
+    <div class="text-muted small">所有建议的出处都在这儿。模型回答数字时只能引用这里的内容</div>
+  </div>
+  <button class="btn btn-outline-brand btn-sm" data-bs-toggle="collapse" data-bs-target="#addBox">＋ 手动入库</button>
+</div>
+
+<div class="collapse mb-3" id="addBox">
+  <div class="card">
+    <div class="card-header">新增知识条目</div>
+    <div class="card-body">
+      <form method="post" action="{{ url_for('knowledge_add') }}">
+        <div class="row g-2">
+          <div class="col-md-2">
+            <label class="form-label">分类</label>
+            <select class="form-select form-select-sm" name="category">
+              {% for c in ['喂养','排泄','免疫','训练','饮食','行为','其他'] %}<option>{{ c }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-md-3"><label class="form-label">主题</label><input class="form-control form-control-sm" name="topic" required></div>
+          <div class="col-md-2"><label class="form-label">适用月龄</label><input class="form-control form-control-sm" name="age_range" placeholder="2-4 月龄"></div>
+          <div class="col-md-3"><label class="form-label">来源</label><input class="form-control form-control-sm" name="source" placeholder="机构名，必须填"></div>
+          <div class="col-md-2"><label class="form-label">链接</label><input class="form-control form-control-sm" name="url"></div>
+          <div class="col-12"><label class="form-label">结论</label><textarea class="form-control form-control-sm" name="conclusion" rows="2" required></textarea></div>
+        </div>
+        <button class="btn btn-brand btn-sm mt-2">入库</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body py-2">
+    <form class="d-flex gap-2 flex-wrap" method="get">
+      <input type="text" name="q" value="{{ q }}" class="form-control form-control-sm" style="max-width:280px" placeholder="搜主题 / 结论 / 来源">
+      <select name="cat" class="form-select form-select-sm" style="max-width:140px">
+        <option value="">全部分类</option>
+        {% for c in cats %}<option value="{{ c }}" {{ 'selected' if cat==c }}>{{ c }}</option>{% endfor %}
+      </select>
+      <button class="btn btn-brand btn-sm">搜索</button>
+      {% if q or cat %}<a href="{{ url_for('knowledge_page') }}" class="btn btn-outline-secondary btn-sm">清空</a>{% endif %}
+      <span class="ms-auto small text-muted align-self-center">共 {{ rows|length }} 条</span>
+    </form>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead><tr><th>分类</th><th>主题</th><th>结论</th><th>适用</th><th>来源</th><th></th></tr></thead>
+          <tbody>
+            {% for r in rows %}
+            <tr>
+              <td><span class="chip">{{ r.category }}</span></td>
+              <td class="fw-semibold small">{{ r.topic }}</td>
+              <td class="small">{{ r.conclusion }}</td>
+              <td class="small text-muted">{{ r.age_range or '—' }}</td>
+              <td class="small text-muted">
+                {{ r.source or '未标来源' }}
+                {% if r.url %}<a href="{{ r.url }}" target="_blank" rel="noopener">↗</a>{% endif %}
+              </td>
+              <td>
+                <form method="post" action="{{ url_for('knowledge_delete', kid=r.id) }}">
+                  <button class="btn btn-sm btn-link text-danger p-0">删</button>
+                </form>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" class="text-center text-muted py-4">没有匹配的条目</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card mb-3">
+      <div class="card-header">🍚 喂养基准表</div>
+      <div class="table-responsive">
+        <table class="table table-sm mb-0">
+          <thead><tr><th>月龄</th><th>餐数</th><th>间隔</th><th>参考体重</th><th>粮量</th></tr></thead>
+          <tbody>
+            {% for r in feed %}
+            <tr><td>{{ r[0] }}</td><td>{{ r[2] }}</td><td class="small">{{ r[3] }}</td><td class="small">{{ r[5] }} kg</td><td class="small">{{ r[6] }} g</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="card-body py-2 small text-muted">
+        换算：幼犬每日总量 = 体重(kg) × 2.5%~4%；成犬 × 1.5%~2%
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-header">💩 排泄频率与评分</div>
+      <div class="card-body py-2">
+        <table class="table table-sm mb-0">
+          <tbody>
+            {% for a, b in potty %}
+            <tr><td class="small">{{ a }}</td><td class="small">{{ b }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <hr class="my-2">
+        <table class="table table-sm mb-0">
+          <tbody>
+            {% for s, form, judge, lv in stools %}
+            <tr>
+              <td style="width:42px">
+                <span class="stool-badge" style="background:{{ '#2E7D5B' if lv=='ok' else ('#C77700' if lv=='warn' else '#C0392B') }}">{{ s }}</span>
+              </td>
+              <td class="small">{{ form }}</td>
+              <td class="small text-muted">{{ judge }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <div class="small text-muted mt-2">憋尿上限 = 月龄 + 1 小时（安静/睡眠状态）</div>
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-header">💉 疫苗与驱虫</div>
+      <div class="table-responsive">
+        <table class="table table-sm mb-0">
+          <tbody>
+            {% for v in vaccines %}
+            <tr><td class="small fw-semibold">{{ v.kind }}</td><td class="small">{{ v.window }}</td></tr>
+            {% endfor %}
+            {% for k, off, win in deworm %}
+            <tr><td class="small fw-semibold">{{ k }}</td><td class="small">{{ win }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-header">🎾 口令顺序</div>
+      <div class="card-body py-2">
+        {% for c in commands %}
+        <div class="small py-1" style="border-bottom:1px dashed var(--dp-line)">
+          <b>{{ c.order }}. {{ c.name }}</b><br>
+          <span class="text-muted">{{ c.how }}</span><br>
+          <span class="text-danger">坑：{{ c.pitfall }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">🚫 禁忌食物</div>
+      <div class="card-body py-2">
+        {% for f, why, lv in forbidden %}
+        <div class="small py-1" style="border-bottom:1px dashed var(--dp-line)">
+          {% if lv == 'danger' %}<span class="text-danger">❗</span>{% else %}<span class="text-warning">⚠️</span>{% endif %}
+          <b>{{ f }}</b> <span class="text-muted">— {{ why }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

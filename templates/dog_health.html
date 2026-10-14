@@ -1,0 +1,324 @@
+{% extends 'base.html' %}
+{% block title %}{{ dog.name }} · 饮食健康{% endblock %}
+
+{% block content %}
+{% set active = 'health' %}
+{% include '_header.html' %}
+
+<div class="row g-3">
+  <div class="col-lg-8">
+
+    <div class="card mb-3">
+      <div class="card-header d-flex justify-content-between">
+        <span>⚖️ 体重曲线</span>
+        <button class="btn btn-sm btn-outline-brand" onclick="quickWeight({{ dog.id }}, '{{ today }}')">＋ 记录体重</button>
+      </div>
+      <div class="card-body"><canvas id="chartWeight" height="110"></canvas></div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-header">🍚 进食记录 <span class="sub">最近 80 条</span></div>
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead><tr><th>日期</th><th>时间</th><th>投喂</th><th>吃完</th><th>达标</th><th>主食</th><th>零食/补充剂</th><th></th></tr></thead>
+          <tbody>
+            {% for e in feeds %}
+            {% set a = e.data.get('amount') %}{% set n = e.data.get('eaten') %}
+            {% set ejson = {'id': e.id, 'type': e.type, 'day': e.day, 'time': e.time, 'note': e.note or '', 'data': e.data} %}
+            <tr>
+              <td>{{ e.day }}</td><td>{{ e.time }}</td>
+              <td>{{ a if a is not none else '—' }} g</td>
+              <td>{{ n if n is not none else '—' }} g</td>
+              <td>
+                {% if a and n is not none %}
+                  {% set r = n/a*100 %}
+                  {% if r >= 90 %}<span class="chip ok">✅ {{ r|round }}%</span>
+                  {% elif r >= 50 %}<span class="chip warn">⚠️ {{ r|round }}%</span>
+                  {% else %}<span class="chip danger">❌ {{ r|round }}%</span>{% endif %}
+                {% else %}—{% endif %}
+              </td>
+              <td class="small">{{ e.data.get('food') or '—' }}</td>
+              <td class="small text-muted">{{ e.data.get('snack') or '' }} {{ e.data.get('supplement') or '' }}{% if not e.data.get('snack') and not e.data.get('supplement') %}—{% endif %}</td>
+              <td class="text-nowrap">
+                <button class="btn btn-sm btn-link text-brand p-0 px-1" data-event='{{ ejson|tojson }}' onclick="openEdit(this)">编辑</button>
+                <button class="btn btn-sm btn-link text-danger p-0 px-1" onclick="delEvent({{ e.id }})">删除</button>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="8" class="text-center text-muted py-4">还没有进食记录</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-header">💩 排泄记录 <span class="sub">最近 80 条</span></div>
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead><tr><th>日期</th><th>时间</th><th>类型</th><th>定点</th><th>评分</th><th>带血</th><th>地点</th><th>触发点</th><th></th></tr></thead>
+          <tbody>
+            {% for e in potties %}
+            {% set ejson = {'id': e.id, 'type': e.type, 'day': e.day, 'time': e.time, 'note': e.note or '', 'data': e.data} %}
+            <tr>
+              <td>{{ e.day }}</td><td>{{ e.time }}</td>
+              <td>{{ e.data.get('kind') or '—' }}</td>
+              <td>{% if e.data.get('success') %}<span class="chip ok">✅</span>{% else %}<span class="chip danger">❌</span>{% endif %}</td>
+              <td>
+                {% set sc = e.data.get('score') %}
+                {% if sc %}
+                <span class="stool-badge" style="background:{{ '#2E7D5B' if sc in (3,4) else ('#C77700' if sc in (1,2,5,6) else '#C0392B') }}">{{ sc }}</span>
+                {% else %}—{% endif %}
+              </td>
+              <td>{% if e.data.get('blood') %}<span class="text-danger fw-bold">❗</span>{% else %}—{% endif %}</td>
+              <td class="small">{{ e.data.get('location') or '—' }}</td>
+              <td class="small text-muted">{{ e.data.get('trigger') or '—' }}</td>
+              <td class="text-nowrap">
+                <button class="btn btn-sm btn-link text-brand p-0 px-1" data-event='{{ ejson|tojson }}' onclick="openEdit(this)">编辑</button>
+                <button class="btn btn-sm btn-link text-danger p-0 px-1" onclick="delEvent({{ e.id }})">删除</button>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="9" class="text-center text-muted py-4">还没有排泄记录</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">🚫 禁忌食物红线 <span class="sub">误食立刻就医</span></div>
+      <div class="table-responsive">
+        <table class="table table-sm mb-0">
+          <tbody>
+            {% for f, why, lv in forbidden %}
+            <tr>
+              <td style="width:170px" class="fw-semibold">
+                {% if lv == 'danger' %}<span class="text-danger">❗</span>{% else %}<span class="text-warning">⚠️</span>{% endif %}
+                {{ f }}
+              </td>
+              <td class="small text-muted">{{ why }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="card-body py-2 small text-danger">
+        注意：洋葱类毒素<b>煮不熟、去不掉</b>，剩菜里有洋葱也不行。清洁时禁用含氨清洁剂（漂白水等），氨味≈尿味。
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card mb-3">
+      <div class="card-header">💉 登记疫苗 / 驱虫</div>
+      <div class="card-body">
+        <form method="post" action="{{ url_for('api_health_record') }}">
+          <input type="hidden" name="dog_id" value="{{ dog.id }}">
+          <div class="mb-2">
+            <label class="form-label">项目</label>
+            <select class="form-select form-select-sm" name="kind">
+              <option>首针多联</option><option>第二针多联</option><option>第三针多联</option>
+              <option>狂犬疫苗</option><option>一岁加强</option>
+              <option>体内驱虫</option><option>体外驱虫</option>
+              <option>体检</option><option>就诊</option>
+            </select>
+          </div>
+          <div class="row g-2 mb-2">
+            <div class="col-6">
+              <label class="form-label">接种日期</label>
+              <input type="date" class="form-control form-control-sm" name="happen_date" value="{{ today }}" required>
+            </div>
+            <div class="col-6">
+              <label class="form-label">下次到期</label>
+              <input type="date" class="form-control form-control-sm" name="next_due">
+            </div>
+          </div>
+          <div class="row g-2 mb-2">
+            <div class="col-6">
+              <label class="form-label">批次/针次</label>
+              <input type="text" class="form-control form-control-sm" name="dose_no" placeholder="第 1 针">
+            </div>
+            <div class="col-6">
+              <label class="form-label">医院</label>
+              <input type="text" class="form-control form-control-sm" name="vet" placeholder="XX 宠物医院">
+            </div>
+          </div>
+          <input type="text" class="form-control form-control-sm mb-2" name="note" placeholder="备注">
+          <button class="btn btn-brand btn-sm w-100">登记</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-header">📅 免疫日历 <span class="sub">按出生日期推算</span></div>
+      <div class="card-body py-2" style="max-height:460px;overflow:auto">
+        {% for s in schedule %}
+        {% set ns = namespace(done=false) %}
+        {% for r in records %}{% if r.kind == s.kind %}{% set ns.done = true %}{% endif %}{% endfor %}
+        <div class="py-2" style="border-bottom:1px dashed var(--dp-line)">
+          <div class="d-flex justify-content-between">
+            <span class="fw-semibold small">{{ s.kind }}</span>
+            {% if ns.done %}<span class="chip ok">已登记</span>
+            {% elif s.date < today %}<span class="chip danger">已到期</span>
+            {% else %}<span class="chip">{{ s.date }}</span>{% endif %}
+          </div>
+          <div class="small text-muted">{{ s.window }}{% if s.tip %} · {{ s.tip }}{% endif %}</div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">🗂 已登记记录</div>
+      <div class="card-body py-2">
+        {% for r in records %}
+        {% set rjson = {'id': r.id, 'kind': r.kind, 'dose_no': r.dose_no or '', 'happen_date': r.happen_date or '', 'next_due': r.next_due or '', 'vet': r.vet or '', 'note': r.note or ''} %}
+        <div class="d-flex justify-content-between align-items-start py-2" style="border-bottom:1px dashed var(--dp-line)">
+          <div class="small">
+            <b>{{ r.kind }}</b> <span class="chip">{{ r.happen_date }}</span>
+            {% if r.dose_no %}<span class="chip">{{ r.dose_no }}</span>{% endif %}
+            {% if r.next_due %}<div class="text-muted">下次：{{ r.next_due }}</div>{% endif %}
+            {% if r.vet %}<div class="text-muted">{{ r.vet }}</div>{% endif %}
+            {% if r.note %}<div class="text-muted">📝 {{ r.note }}</div>{% endif %}
+          </div>
+          <div class="text-nowrap">
+            <button type="button" class="btn btn-sm btn-link text-brand p-0 px-1"
+                    data-record='{{ rjson|tojson }}' onclick="openHealthEdit(this)">编辑</button>
+            <form method="post" action="{{ url_for('health_record_delete', rid=r.id) }}" class="d-inline">
+              <button class="btn btn-sm btn-link text-danger p-0 px-1">删除</button>
+            </form>
+          </div>
+        </div>
+        {% else %}
+        <div class="text-muted small py-3 text-center">还没有免疫记录</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{% include '_checkin_modal.html' %}
+
+<!-- 免疫 / 就诊记录 · 编辑弹窗 -->
+<div class="modal fade" id="hrModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h6 class="modal-title">✏️ 修改免疫 / 就诊记录</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="hrId">
+        <div class="mb-2">
+          <label class="form-label">项目</label>
+          <input class="form-control form-control-sm" id="hrKind" list="hrKinds">
+          <datalist id="hrKinds">
+            <option>首针多联</option><option>第二针多联</option><option>第三针多联</option>
+            <option>狂犬疫苗</option><option>一岁加强</option>
+            <option>体内驱虫</option><option>体外驱虫</option>
+            <option>体检</option><option>就诊</option>
+          </datalist>
+        </div>
+        <div class="row g-2 mb-2">
+          <div class="col-6">
+            <label class="form-label">接种日期</label>
+            <input type="date" class="form-control form-control-sm" id="hrDate">
+          </div>
+          <div class="col-6">
+            <label class="form-label">下次到期</label>
+            <input type="date" class="form-control form-control-sm" id="hrDue">
+          </div>
+        </div>
+        <div class="row g-2 mb-2">
+          <div class="col-6">
+            <label class="form-label">批次 / 针次</label>
+            <input type="text" class="form-control form-control-sm" id="hrDose">
+          </div>
+          <div class="col-6">
+            <label class="form-label">医院</label>
+            <input type="text" class="form-control form-control-sm" id="hrVet">
+          </div>
+        </div>
+        <label class="form-label">备注</label>
+        <input type="text" class="form-control form-control-sm" id="hrNote">
+      </div>
+      <div class="modal-footer py-2">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">取消</button>
+        <button type="button" class="btn btn-brand btn-sm" onclick="submitHealthEdit()">保存修改</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function(){
+  var raw = {{ weight_json|safe }};
+  var el = document.getElementById('chartWeight');
+  if (!el) return;
+  if (!raw.length) {
+    el.parentNode.innerHTML = '<div class="text-muted text-center py-4">还没有体重记录，点右上角「记录体重」开始</div>';
+    return;
+  }
+  new Chart(el, {
+    type: 'line',
+    data: {
+      labels: raw.map(function(r){ return r[0].slice(5); }),
+      datasets: [{
+        label: '体重 kg', data: raw.map(function(r){ return r[1]; }),
+        borderColor: '#2E7D5B', backgroundColor: 'rgba(46,125,91,.12)',
+        fill: true, tension: .3, pointBackgroundColor: '#1F5C42'
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: { y: { ticks: { callback: function(v){ return v + ' kg'; } } } }
+    }
+  });
+})();
+</script>
+<script>
+/* 免疫 / 就诊记录 · 编辑 */
+(function () {
+  var el = document.getElementById('hrModal');
+  var hrModal = el ? new bootstrap.Modal(el) : null;
+  function v(id) { var e = document.getElementById(id); return e ? String(e.value).trim() : ''; }
+
+  window.openHealthEdit = function (btn) {
+    if (!hrModal) return;
+    var r;
+    try { r = JSON.parse(btn.dataset.record); } catch (e) { return; }
+    document.getElementById('hrId').value = r.id;
+    document.getElementById('hrKind').value = r.kind || '';
+    document.getElementById('hrDose').value = r.dose_no || '';
+    document.getElementById('hrDate').value = r.happen_date || '';
+    document.getElementById('hrDue').value = r.next_due || '';
+    document.getElementById('hrVet').value = r.vet || '';
+    document.getElementById('hrNote').value = r.note || '';
+    hrModal.show();
+  };
+
+  window.submitHealthEdit = function () {
+    fetch('/api/health_record/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: Number(document.getElementById('hrId').value),
+        kind: v('hrKind'),
+        dose_no: v('hrDose'),
+        happen_date: v('hrDate'),
+        next_due: v('hrDue'),
+        vet: v('hrVet'),
+        note: v('hrNote')
+      })
+    }).then(function (r) { return r.json(); }).then(function (res) {
+      if (res.ok) location.reload();
+      else alert('保存失败：' + (res.error || '未知错误'));
+    }).catch(function () { alert('网络错误，记录没有保存'); });
+  };
+})();
+</script>
+{% endblock %}

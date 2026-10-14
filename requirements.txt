@@ -1,0 +1,7 @@
+# 狗狗管理平台 依赖清单
+flask
+requests
+beautifulsoup4
+lxml
+Pillow
+waitress

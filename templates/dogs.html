@@ -1,0 +1,88 @@
+{% extends 'base.html' %}
+{% block title %}狗狗档案 · 狗狗管理平台{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div>
+    <h4 class="mb-0 fw-bold">狗狗档案</h4>
+    <div class="text-muted small">共 {{ total }} 条 · 「在养」的才参与喂养、免疫、训练提醒</div>
+  </div>
+  <a href="{{ url_for('dog_new') }}" class="btn btn-brand btn-sm">＋ 新增狗狗</a>
+</div>
+
+<!-- 状态筛选 -->
+<div class="d-flex flex-wrap gap-1 mb-3">
+  <a class="btn btn-sm {{ 'btn-brand' if not sel else 'btn-outline-brand' }}"
+     href="{{ url_for('dogs') }}">全部 {{ total }}</a>
+  {% for s in DOG_STATUS %}
+  <a class="btn btn-sm {{ 'btn-brand' if sel == s else 'btn-outline-brand' }}"
+     href="{{ url_for('dogs', status=s) }}">{{ s }} {{ counts.get(s, 0) }}</a>
+  {% endfor %}
+</div>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th>名字</th><th>犬种</th><th>性别</th><th>出生日期</th><th>月龄</th>
+          <th>体重</th><th>状态</th><th>最近状态变更</th><th class="text-end">操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for d in dogs %}
+        <tr class="{{ 'text-muted' if d.status != '在养' }}">
+          <td class="fw-semibold">
+            <a href="{{ url_for('dog_today', did=d.id) }}" class="text-decoration-none">{{ d.name }}</a>
+          </td>
+          <td>{{ d.breed_cn or '—' }}</td>
+          <td>{{ d.sex or '—' }}</td>
+          <td>{{ d.birth_date or '待补' }}</td>
+          <td><span class="chip brand">{{ d.age }}</span></td>
+          <td>{{ d.weight_current ~ ' kg' if d.weight_current else '—' }}</td>
+          <td>
+            <span class="chip {{ STATUS_CHIP.get(d.status, '') }}">{{ d.status }}</span>
+          </td>
+          <td class="small">
+            {% if d.last_log %}
+            <div>{{ d.last_log.changed_at }}</div>
+            <div class="text-muted">
+              {{ d.last_log.old_status }} → {{ d.last_log.new_status }}
+              {% if d.last_log.note %}· {{ d.last_log.note }}{% endif %}
+            </div>
+            {% else %}—{% endif %}
+          </td>
+          <td class="text-end text-nowrap">
+            <a href="{{ url_for('dog_today', did=d.id) }}" class="btn btn-sm btn-outline-brand">工作台</a>
+            <a href="{{ url_for('dog_edit', did=d.id) }}" class="btn btn-sm btn-outline-secondary">编辑</a>
+            <button class="btn btn-sm btn-outline-secondary"
+                    data-dog='{{ {"id": d.id, "name": d.name, "status": d.status}|tojson }}'
+                    onclick="openStatusModal(this)">改状态</button>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="9" class="text-center text-muted py-4">
+          {% if sel %}没有「{{ sel }}」状态的狗狗。{% else %}还没有档案。{% endif %}
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card mt-3">
+  <div class="card-header">ℹ️ 状态含义</div>
+  <div class="card-body py-2">
+    <table class="table table-sm mb-0">
+      <tbody>
+        {% for s in DOG_STATUS %}
+        <tr>
+          <td style="width:80px"><span class="chip {{ STATUS_CHIP.get(s, '') }}">{{ s }}</span></td>
+          <td class="small text-muted">{{ STATUS_TIP.get(s, '') }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

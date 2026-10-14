@@ -1,0 +1,230 @@
+{% extends 'base.html' %}
+{% block title %}{{ dog.name }} · 档案与免疫{% endblock %}
+
+{% block content %}
+{% set active = 'profile' %}
+{% include '_header.html' %}
+
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="card mb-3">
+      <div class="card-header d-flex justify-content-between">
+        <span>🗂 基本档案</span>
+        <a href="{{ url_for('dog_edit', did=dog.id) }}" class="btn btn-sm btn-outline-brand">编辑</a>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-sm mb-0">
+          <tbody>
+            <tr>
+              <td class="text-muted" style="width:140px">管理状态</td>
+              <td>
+                <span class="chip {{ STATUS_CHIP.get(dog.status or '在养', '') }}">{{ dog.status or '在养' }}</span>
+                {% if dog.status_changed_at %}
+                <span class="small text-muted ms-2">变更于 {{ dog.status_changed_at }}</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% set rows = [
+              ('名字', dog.name), ('犬种（中）', dog.breed_cn), ('犬种（英）', dog.breed_en),
+              ('性别', dog.sex), ('出生日期', dog.birth_date), ('到家日期', dog.arrive_date),
+              ('月龄', age), ('阶段', stage),
+              ('当前体重', (dog.weight_current ~ ' kg') if dog.weight_current else None),
+              ('体重更新日期', dog.weight_updated_at),
+              ('肩高', (dog.shoulder_height ~ ' cm') if dog.shoulder_height else None),
+              ('毛色', dog.coat_color), ('绝育状态', dog.neutered),
+              ('性格标签', dog.personality_tags), ('芯片号', dog.chip_no),
+              ('免疫证/登记证号', dog.license_no),
+              ('主人', dog.owner_name), ('联系电话', dog.owner_phone),
+              ('来源', dog.purchase_source)
+            ] %}
+            {% for k, v in rows %}
+            <tr>
+              <td class="text-muted" style="width:140px">{{ k }}</td>
+              <td>{{ v if v else '待补' }}</td>
+            </tr>
+            {% endfor %}
+            {% if dog.note %}
+            <tr><td class="text-muted">备注</td><td>{{ dog.note }}</td></tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-header">🧬 父母信息 <span class="sub">血统追溯</span></div>
+      <div class="table-responsive">
+        <table class="table table-sm mb-0">
+          <tbody>
+            <tr>
+              <td class="text-muted" style="width:140px">👨 父犬名字</td>
+              <td>{{ dog.sire_name or '待补' }}</td>
+            </tr>
+            <tr><td class="text-muted">父犬犬种</td><td>{{ dog.sire_breed or '待补' }}</td></tr>
+            <tr><td class="text-muted">父犬芯片/血统号</td><td>{{ dog.sire_chip or '待补' }}</td></tr>
+            <tr>
+              <td class="text-muted">👩 母犬名字</td>
+              <td>{{ dog.dam_name or '待补' }}</td>
+            </tr>
+            <tr><td class="text-muted">母犬犬种</td><td>{{ dog.dam_breed or '待补' }}</td></tr>
+            <tr><td class="text-muted">母犬芯片/血统号</td><td>{{ dog.dam_chip or '待补' }}</td></tr>
+            {% if dog.parents_note %}
+            <tr><td class="text-muted">血统备注</td><td>{{ dog.parents_note }}</td></tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+      <div class="card-body py-2 small text-muted">
+        父母信息对判断遗传病风险、体型预期有用，也能在转送或就医时说明来历。
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">🐾 社会化练习清单 <span class="sub">关键期 3-16 周</span></div>
+      <div class="table-responsive">
+        <table class="table table-sm mb-0">
+          <thead><tr><th>项目</th><th>做法</th><th>频率</th></tr></thead>
+          <tbody>
+            {% for a, b, c in social %}
+            <tr><td class="fw-semibold">{{ a }}</td><td class="small text-muted">{{ b }}</td><td class="small">{{ c }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="card-body py-2 small text-muted">
+        疫苗未完成前，用「抱着逛」的方式让幼犬用眼睛耳朵鼻子感受外界，不落地、不接触陌生狗狗。
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card mb-3">
+      <div class="card-header">📅 免疫与驱虫日历 <span class="sub">按出生日期自动推算</span></div>
+      <div class="table-responsive" style="max-height:520px;overflow:auto">
+        <table class="table table-sm mb-0">
+          <thead><tr><th>项目</th><th>计划日期</th><th>窗口</th><th>状态</th></tr></thead>
+          <tbody>
+            {% for s in schedule %}
+            {% set ns = namespace(done=false) %}
+            {% for r in records %}{% if r.kind == s.kind %}{% set ns.done = true %}{% endif %}{% endfor %}
+            <tr>
+              <td class="fw-semibold small">{{ s.kind }}</td>
+              <td class="small">{{ s.date }}</td>
+              <td class="small text-muted">{{ s.window }}{% if s.tip %}<br>{{ s.tip }}{% endif %}</td>
+              <td>
+                {% if ns.done %}<span class="chip ok">已登记</span>
+                {% elif s.date < today %}<span class="chip danger">已到期</span>
+                {% else %}<span class="chip">待办</span>{% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="card-body py-2 small text-muted">
+        接种后 7 天：不洗澡、不外出遛、不接触陌生猫狗、不换粮。打完留院观察 30 分钟。
+        狂犬疫苗为法定强制，满 3 月龄接种后办养犬登记证。
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">📋 已登记免疫记录</div>
+      <div class="card-body py-2">
+        {% for r in records %}
+        <div class="d-flex justify-content-between align-items-start py-2" style="border-bottom:1px dashed var(--dp-line)">
+          <div class="small">
+            <b>{{ r.kind }}</b> <span class="chip">{{ r.happen_date }}</span>
+            {% if r.dose_no %}<span class="chip">{{ r.dose_no }}</span>{% endif %}
+            {% if r.next_due %}<div class="text-muted">下次到期：{{ r.next_due }}</div>{% endif %}
+            {% if r.vet %}<div class="text-muted">{{ r.vet }}</div>{% endif %}
+            {% if r.note %}<div class="text-muted">{{ r.note }}</div>{% endif %}
+          </div>
+          <form method="post" action="{{ url_for('health_record_delete', rid=r.id) }}">
+            <button class="btn btn-sm btn-link text-danger p-0">删除</button>
+          </form>
+        </div>
+        {% else %}
+        <div class="text-muted small py-3 text-center">还没有免疫记录，去「饮食健康」页登记</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="card mt-3">
+      <div class="card-header d-flex justify-content-between">
+        <span>🔁 状态变更历史</span>
+        <span class="sub">{{ status_log|length }} 条</span>
+      </div>
+      <div class="card-body py-2" style="max-height:340px;overflow:auto">
+        {% for l in status_log %}
+        <div class="py-2" style="border-bottom:1px dashed var(--dp-line)">
+          <div class="d-flex justify-content-between align-items-start gap-2">
+            <div class="small">
+              <span class="chip">{{ l.old_status }}</span>
+              <span class="text-muted mx-1">→</span>
+              <span class="chip {{ STATUS_CHIP.get(l.new_status, '') }}">{{ l.new_status }}</span>
+            </div>
+            <div class="small text-muted text-nowrap">{{ l.changed_at }}</div>
+          </div>
+          {% if l.note %}<div class="small text-muted mt-1">📝 {{ l.note }}</div>{% endif %}
+        </div>
+        {% else %}
+        <div class="text-muted small py-3 text-center">
+          还没有状态变更记录。点右上角「改状态」，状态变化会自动记下内容与时间。
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="card mt-3">
+      <div class="card-header d-flex justify-content-between">
+        <span>📖 最近日记</span>
+        <span>
+          <span class="sub">共 {{ diary_n }} 篇</span>
+          <a href="{{ url_for('dog_diary', did=dog.id) }}" class="btn btn-sm btn-link text-brand p-0 ms-2">全部</a>
+        </span>
+      </div>
+      <div class="card-body py-2">
+        {% for e in recent_diary %}
+        <div class="d-flex gap-2 py-2" style="border-bottom:1px dashed var(--dp-line)">
+          {% if e.media and e.media[0].kind == 'image' %}
+          <img src="{{ url_for('media_file', relpath=(e.media[0].thumb or e.media[0].path)) }}"
+               style="width:54px;height:54px;object-fit:cover;border-radius:8px;flex:0 0 54px" loading="lazy" alt="">
+          {% endif %}
+          <div class="small flex-grow-1">
+            <div class="fw-semibold">{{ e.title or '(无标题)' }}
+              {% if e.mood %}<span class="chip">{{ DIARY_MOOD_EMOJI.get(e.mood, '') }}</span>{% endif %}
+            </div>
+            <div class="text-muted">{{ e.day }} · {{ e.content[:40] if e.content else '' }}{{ '…' if e.content and e.content|length > 40 }}</div>
+          </div>
+        </div>
+        {% else %}
+        <div class="text-muted small py-3 text-center">还没有日记，去「📖 狗狗日记」写第一篇</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="card mt-3">
+      <div class="card-header d-flex justify-content-between">
+        <span>🧾 消费概览</span>
+        <a href="{{ url_for('dog_expense', did=dog.id) }}" class="btn btn-sm btn-link text-brand p-0">去记账</a>
+      </div>
+      <div class="card-body py-2">
+        <div class="row g-2 text-center">
+          <div class="col-4"><div class="small text-muted">本月</div><div class="fw-bold text-brand">¥{{ '%.2f'|format(expense.month) }}</div></div>
+          <div class="col-4"><div class="small text-muted">今年</div><div class="fw-bold">¥{{ '%.2f'|format(expense.year) }}</div></div>
+          <div class="col-4"><div class="small text-muted">总计</div><div class="fw-bold">¥{{ '%.2f'|format(expense.total) }}</div></div>
+        </div>
+        {% if expense.by_cat %}
+        <div class="mt-2 small">
+          <span class="text-muted">花得最多：</span>
+          {% for c in expense.by_cat[:3] %}
+          <span class="chip brand">{{ c.category }} ¥{{ '%.0f'|format(c.s or 0) }}</span>
+          {% endfor %}
+          <span class="text-muted">共 {{ expense.count }} 笔</span>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

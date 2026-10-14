@@ -1,0 +1,139 @@
+{% extends 'base.html' %}
+{% block title %}{{ '编辑档案' if dog else '新增狗狗' }} · 狗狗管理平台{% endblock %}
+
+{% macro f(name, label, ph='', req=False, type='text') %}
+<div class="col-md-4 col-6">
+  <label class="form-label {{ 'req' if req }}">{{ label }}</label>
+  <input type="{{ type }}" step="0.1" class="form-control form-control-sm" name="{{ name }}"
+         value="{{ dog[name] if dog and dog[name] is not none else '' }}" placeholder="{{ ph }}">
+</div>
+{% endmacro %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="mb-0 fw-bold">{{ '编辑档案' if dog else '新增狗狗' }}</h4>
+  <a href="{{ url_for('dogs') }}" class="btn btn-outline-secondary btn-sm">返回列表</a>
+</div>
+
+<form method="post">
+  <div class="card mb-3">
+    <div class="card-header">① 最小启动集 <span class="sub">先填这三项就能开跑</span></div>
+    <div class="card-body">
+      <div class="row g-3">
+        {{ f('name', '名字', '旺财', True) }}
+        {{ f('breed_cn', '犬种（中文）', '金毛寻回犬') }}
+        {{ f('breed_en', '犬种（英文）', 'Golden Retriever') }}
+        {{ f('birth_date', '出生日期', '', True, 'date') }}
+        <div class="col-md-4 col-6">
+          <label class="form-label">性别</label>
+          <select class="form-select form-select-sm" name="sex">
+            <option value="">未填</option>
+            {% for s in ['公', '母'] %}
+            <option value="{{ s }}" {{ 'selected' if dog and dog.sex == s }}>{{ s }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4 col-6">
+          <label class="form-label">绝育状态</label>
+          <select class="form-select form-select-sm" name="neutered">
+            <option value="">未填</option>
+            {% for s in ['已绝育', '未绝育'] %}
+            <option value="{{ s }}" {{ 'selected' if dog and dog.neutered == s }}>{{ s }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-header">② 管理状态 <span class="sub">决定要不要继续提醒喂养、免疫、训练</span></div>
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-4 col-6">
+          <label class="form-label">状态</label>
+          <select class="form-select form-select-sm" name="status">
+            {% set cur = dog.status if dog and dog.status else '在养' %}
+            {% for s in DOG_STATUS %}
+            <option value="{{ s }}" {{ 'selected' if cur == s }}>{{ s }} —— {{ STATUS_TIP.get(s, '') }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-8 col-12">
+          <label class="form-label">状态变更说明</label>
+          <input type="text" class="form-control form-control-sm" name="status_note"
+                 placeholder="{% if dog %}改了状态就写一句原因（会记入状态变更历史）{% else %}建档时就不是「在养」的话，写一句原因{% endif %}">
+          {% if dog and dog.status_changed_at %}
+          <div class="small text-muted mt-1">
+            当前：<b>{{ dog.status }}</b> · 上次变更 {{ dog.status_changed_at }}
+            <a href="{{ url_for('dog_profile', did=dog.id) }}" class="ms-1">查看变更历史</a>
+          </div>
+          {% else %}
+          <div class="small text-muted mt-1">状态真的变了才会留记录（原状态 → 新状态 + 说明 + 时间）。</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-header">③ 身体与健康</div>
+    <div class="card-body">
+      <div class="row g-3">
+        {{ f('weight_current', '当前体重（kg）', '5.2', False, 'number') }}
+        {{ f('shoulder_height', '肩高（cm）', '', False, 'number') }}
+        {{ f('coat_color', '毛色', '金黄色') }}
+        {{ f('arrive_date', '到家日期', '', False, 'date') }}
+        {{ f('personality_tags', '性格标签', '亲人 / 胆小 / 兴奋度高 / 护食') }}
+        {{ f('purchase_source', '来源', '购买 / 领养 / 朋友赠予') }}
+      </div>
+    </div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-header">④ 父母信息 <span class="sub">血统追溯用，选填</span></div>
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-12"><div class="fw-semibold small">👨 父亲（父犬）</div></div>
+        {{ f('sire_name', '父犬名字', '大福') }}
+        {{ f('sire_breed', '父犬犬种', '威尔士柯基犬') }}
+        {{ f('sire_chip', '父犬芯片号 / 血统号', '') }}
+        <div class="col-12"><div class="fw-semibold small mt-2">👩 母亲（母犬）</div></div>
+        {{ f('dam_name', '母犬名字', '妞妞') }}
+        {{ f('dam_breed', '母犬犬种', '威尔士柯基犬') }}
+        {{ f('dam_chip', '母犬芯片号 / 血统号', '') }}
+        <div class="col-12">
+          <label class="form-label">血统 / 父母备注</label>
+          <textarea class="form-control form-control-sm" name="parents_note" rows="2"
+            placeholder="血统证书号、同窝只数、父母有无遗传病史、犬舍名称等">{{ dog.parents_note if dog and dog.parents_note else '' }}</textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-header">⑤ 证件与主人</div>
+    <div class="card-body">
+      <div class="row g-3">
+        {{ f('chip_no', '芯片号', '') }}
+        {{ f('license_no', '免疫证 / 养犬登记证号', '') }}
+        {{ f('owner_name', '主人姓名', '') }}
+        {{ f('owner_phone', '联系电话', '') }}
+      </div>
+    </div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-header">⑥ 备注</div>
+    <div class="card-body">
+      <textarea class="form-control form-control-sm" name="note" rows="2"
+        placeholder="过敏史、既往病史、特殊习惯等">{{ dog.note if dog and dog.note else '' }}</textarea>
+    </div>
+  </div>
+
+  <div class="d-flex gap-2">
+    <button class="btn btn-brand">保存档案</button>
+    <a href="{{ url_for('dogs') }}" class="btn btn-outline-secondary">取消</a>
+  </div>
+</form>
+{% endblock %}

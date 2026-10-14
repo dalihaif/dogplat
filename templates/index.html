@@ -1,0 +1,137 @@
+{% extends 'base.html' %}
+{% block title %}总览 · 狗狗管理平台{% endblock %}
+
+{% block content %}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+  <div>
+    <h4 class="mb-0 fw-bold">今日总览</h4>
+    <div class="text-muted small">{{ today }}　所有计划随月龄自动更新</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('dog_new') }}" class="btn btn-brand btn-sm">＋ 新增狗狗</a>
+    <a href="{{ url_for('knowledge_page') }}" class="btn btn-outline-brand btn-sm">知识库</a>
+  </div>
+</div>
+
+{% if alerts %}
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between">
+    <span>🔔 待处理提醒</span>
+    <span class="sub">{{ alerts|length }} 条</span>
+  </div>
+  <div class="card-body py-2">
+    {% for a in alerts[:6] %}
+    <div class="alert-item {{ a.level }}">
+      <div class="t">
+        {% if a.level == 'danger' %}❌{% else %}⚠️{% endif %}
+        <a href="{{ url_for('dog_today', did=a.dog_id) }}" class="text-decoration-none text-reset">{{ a.dog }}</a>
+        — {{ a.title }}
+      </div>
+      <div class="d">{{ a.detail }}</div>
+      <div class="a">👉 {{ a.action }}</div>
+    </div>
+    {% endfor %}
+    {% if alerts|length > 6 %}
+    <div class="text-muted small">还有 {{ alerts|length - 6 }} 条，进入各狗狗的工作台查看</div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+{% if not cards %}
+<div class="card">
+  <div class="card-body text-center py-5">
+    <div style="font-size:48px">🐾</div>
+    <h5 class="mt-2">还没有登记狗狗</h5>
+    <p class="text-muted mb-3">先填名字、犬种、出生日期三项就能开始，系统会自动算出月龄并排好喂养与排便时间表。</p>
+    <a href="{{ url_for('dog_new') }}" class="btn btn-brand">立即登记</a>
+  </div>
+</div>
+{% endif %}
+
+<div class="row g-3">
+  {% for c in cards %}
+  <div class="col-12 col-lg-6 col-xxl-4">
+    <div class="card dog-card">
+      <div class="card-body">
+        <div class="d-flex gap-3 align-items-start mb-2">
+          <div class="dog-avatar">{{ '🐕' if c.dog.sex != '母' else '🐩' }}</div>
+          <div class="flex-grow-1 min-w-0">
+            <div class="d-flex justify-content-between align-items-start">
+              <div>
+                <p class="dog-name">{{ c.dog.name }}</p>
+                <div class="dog-meta">{{ c.dog.breed_cn or '未填犬种' }}{% if c.dog.sex %} · {{ c.dog.sex }}{% endif %}
+                  {% if c.dog.weight_current %} · {{ c.dog.weight_current }} kg{% endif %}</div>
+              </div>
+              {% if c.danger %}<span class="chip danger">❌ {{ c.danger }}</span>
+              {% elif c.warn %}<span class="chip warn">⚠️ {{ c.warn }}</span>
+              {% else %}<span class="chip ok">✅ 正常</span>{% endif %}
+            </div>
+            <div class="mt-2 d-flex flex-wrap gap-1">
+              <span class="chip brand">{{ c.age }}</span>
+              <span class="chip">{{ c.stage }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="row g-2 text-center mb-2">
+          <div class="col-4">
+            <div class="stat"><div class="v" style="color:var(--dp-brand-d)">{{ c.plan.meals }}</div><div class="k">餐/日</div></div>
+          </div>
+          <div class="col-4">
+            <div class="stat"><div class="v" style="font-size:1rem;padding-top:6px">{{ c.plan.amount.replace(' g/日','') }}</div><div class="k">克/日</div></div>
+          </div>
+          <div class="col-4">
+            <div class="stat"><div class="v" style="color:{{ 'var(--dp-ok)' if c.pct>=80 else ('var(--dp-warn)' if c.pct>=40 else 'var(--dp-danger)') }}">{{ c.pct }}%</div><div class="k">今日完成</div></div>
+          </div>
+        </div>
+
+        <div class="progress mb-2" style="height:6px">
+          <div class="progress-bar" style="width:{{ c.pct }}%"></div>
+        </div>
+        <div class="dog-meta mb-2">{{ c.hit }}/{{ c.total }} 项已完成　{{ c.plan.amount_src }}</div>
+
+        {% for a in c.alerts[:2] %}
+        <div class="alert-item {{ a.level }} mb-1" style="padding:5px 10px">
+          <div class="t" style="font-size:.82rem">
+            {% if a.level == 'danger' %}❌{% else %}⚠️{% endif %} {{ a.title }}
+          </div>
+        </div>
+        {% endfor %}
+
+        <div class="d-flex gap-2 mt-3">
+          <a href="{{ url_for('dog_today', did=c.dog.id) }}" class="btn btn-brand btn-sm flex-grow-1">今日打卡</a>
+          <a href="{{ url_for('dog_weekly', did=c.dog.id) }}" class="btn btn-outline-brand btn-sm">周报</a>
+          <a href="{{ url_for('dog_profile', did=c.dog.id) }}" class="btn btn-outline-brand btn-sm">档案</a>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% if others %}
+<div class="card mt-3">
+  <div class="card-header d-flex justify-content-between">
+    <span>📦 非在养狗狗</span>
+    <span class="sub">{{ others|length }} 只 · 不再参与喂养免疫训练提醒</span>
+  </div>
+  <div class="card-body py-2">
+    {% for d in others %}
+    <div class="d-flex justify-content-between align-items-center py-2"
+         style="border-bottom:1px dashed var(--dp-line)">
+      <div class="small">
+        <a href="{{ url_for('dog_profile', did=d.id) }}" class="text-decoration-none fw-semibold">{{ d.name }}</a>
+        <span class="chip {{ STATUS_CHIP.get(d.status or '', '') }} ms-1">{{ d.status }}</span>
+        <span class="text-muted ms-2">{{ d.status_changed_at or '' }}</span>
+      </div>
+      <a href="{{ url_for('dog_profile', did=d.id) }}" class="btn btn-sm btn-outline-secondary">看档案</a>
+    </div>
+    {% endfor %}
+    <div class="small text-muted mt-2">想恢复提醒：打开档案点「改状态」，改回「在养」即可。</div>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

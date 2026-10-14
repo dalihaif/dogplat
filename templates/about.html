@@ -1,0 +1,113 @@
+{% extends 'base.html' %}
+{% block title %}关于 · {{ APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+  {# ---------------- 作者 ---------------- #}
+  <div class="col-lg-5">
+    <div class="card mb-3">
+      <div class="card-header">👤 作者</div>
+      <div class="card-body">
+        <div class="d-flex align-items-center gap-3 mb-3">
+          <div class="dp-author-avatar lg">🐕</div>
+          <div>
+            <div class="h5 mb-0 fw-bold">{{ AUTHOR.name }}</div>
+            <div class="small text-muted">{{ AUTHOR.org }}</div>
+            <div class="small text-muted">📍 {{ AUTHOR.city }}</div>
+          </div>
+        </div>
+
+        <table class="table table-sm mb-3">
+          <tbody>
+            <tr>
+              <td class="text-muted" style="width:96px">📱 电话</td>
+              <td><a href="tel:{{ AUTHOR.phone }}">{{ AUTHOR.phone }}</a></td>
+            </tr>
+            <tr>
+              <td class="text-muted">✉️ 邮箱</td>
+              <td><a href="mailto:{{ AUTHOR.email }}">{{ AUTHOR.email }}</a></td>
+            </tr>
+            <tr>
+              <td class="text-muted">🏢 单位</td>
+              <td>{{ AUTHOR.org }}</td>
+            </tr>
+            <tr>
+              <td class="text-muted">🐙 GitHub</td>
+              <td><a href="{{ AUTHOR.github_url }}" target="_blank" rel="noopener">{{ AUTHOR.github }}</a></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="small">{{ AUTHOR.intro }}</div>
+        {% if AUTHOR.slogan %}
+        <div class="alert alert-light border mt-3 mb-0 py-2 small">💡 {{ AUTHOR.slogan }}</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">ℹ️ 平台信息</div>
+      <div class="table-responsive">
+        <table class="table table-sm mb-0">
+          <tbody>
+            <tr><td class="text-muted" style="width:120px">名称</td><td>{{ APP_NAME }}</td></tr>
+            <tr><td class="text-muted">版本</td><td><span class="chip brand">{{ APP_VERSION }}</span></td></tr>
+            <tr><td class="text-muted">首次上线</td><td>{{ since }}</td></tr>
+            <tr><td class="text-muted">运行方式</td><td>本机 / 家庭局域网，离线可用</td></tr>
+            <tr><td class="text-muted">技术栈</td><td class="small">Flask + SQLite + Bootstrap 5 + Chart.js + waitress</td></tr>
+            <tr><td class="text-muted">数据位置</td><td class="small"><code>data/dogplat.db</code> + <code>data/uploads/</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card-body py-2 small text-muted">
+        数据只存在运行服务的那台电脑上，不联网、不上传。备份 = 复制 <code>dogplat.db</code> 与 <code>uploads/</code> 目录。
+      </div>
+    </div>
+  </div>
+
+  {# ---------------- 功能 + 数据 ---------------- #}
+  <div class="col-lg-7">
+    <div class="card mb-3">
+      <div class="card-header">📦 当前数据量</div>
+      <div class="card-body">
+        <div class="row g-2">
+          <div class="col-6 col-md-3"><div class="stat"><div class="v">{{ stat.dogs }}</div><div class="k">狗狗档案</div></div></div>
+          <div class="col-6 col-md-3"><div class="stat"><div class="v">{{ stat.managed }}</div><div class="k">在养中</div></div></div>
+          <div class="col-6 col-md-3"><div class="stat"><div class="v">{{ stat.events }}</div><div class="k">照护记录</div></div></div>
+          <div class="col-6 col-md-3"><div class="stat"><div class="v">{{ stat.diary }}</div><div class="k">日记</div></div></div>
+          <div class="col-6 col-md-3"><div class="stat"><div class="v">{{ stat.media }}</div><div class="k">照片/视频</div></div></div>
+          <div class="col-6 col-md-3"><div class="stat"><div class="v">{{ stat.expense }}</div><div class="k">记账笔数</div></div></div>
+          <div class="col-6 col-md-3"><div class="stat"><div class="v">¥{{ '%.0f'|format(stat.spent) }}</div><div class="k">累计花费</div></div></div>
+          <div class="col-6 col-md-3"><div class="stat"><div class="v">{{ stat.knowledge }}</div><div class="k">知识库条目</div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-header">🧩 功能模块</div>
+      <div class="table-responsive">
+        <table class="table table-sm mb-0">
+          <thead><tr><th>模块</th><th>做什么</th></tr></thead>
+          <tbody>
+            <tr><td class="fw-semibold">狗狗档案</td><td class="small">月龄阶段自动算、管理状态（在养/送人/死亡/走失/其他）、父母血统、状态变更留痕</td></tr>
+            <tr><td class="fw-semibold">今日待办</td><td class="small">按月龄自动排喂养与排便时间表，一键打卡</td></tr>
+            <tr><td class="fw-semibold">记录管理</td><td class="small">喂食/排泄/训练/体重/饮水/备注六类记录，可编辑、删除、筛选、分页</td></tr>
+            <tr><td class="fw-semibold">狗狗日记</td><td class="small">图文/视频日记，多附件上传、自动缩略图、按月筛选</td></tr>
+            <tr><td class="fw-semibold">记账</td><td class="small">狗粮/用品/洗澡/疫苗等 12 类消费，分类饼图 + 12 月走势 + CSV 导出</td></tr>
+            <tr><td class="fw-semibold">训练</td><td class="small">口令教法、成功率统计、自动判升阶/退阶（只做正向强化）</td></tr>
+            <tr><td class="fw-semibold">饮食健康</td><td class="small">进食达标率、便便 1-7 分、体重曲线、禁忌红线</td></tr>
+            <tr><td class="fw-semibold">周报</td><td class="small">综合分 + 结论 + 看板 + 下周计划</td></tr>
+            <tr><td class="fw-semibold">知识库 / 联网检索</td><td class="small">内置基准数据 + 联网检索入库（人工确认）</td></tr>
+            <tr><td class="fw-semibold">PWA</td><td class="small">手机装到桌面，离线可看</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">📄 免责声明</div>
+      <div class="card-body small">{{ DISCLAIMER }}</div>
+    </div>
+  </div>
+</div>
+{% endblock %}

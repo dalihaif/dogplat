@@ -1,0 +1,56 @@
+{% set dstat = dog.status if dog.status else '在养' %}
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+  <div class="d-flex align-items-center gap-3">
+    <div class="dog-avatar">{{ '🐕' if dog.sex != '母' else '🐩' }}</div>
+    <div>
+      <h4 class="mb-0 fw-bold">{{ dog.name }}
+        {% if dog.sex %}<span class="chip">{{ dog.sex }}</span>{% endif %}
+        <span class="chip {{ STATUS_CHIP.get(dstat, '') }}">{{ dstat }}</span>
+      </h4>
+      <div class="dog-meta">
+        {{ dog.breed_cn or '未填犬种' }} · 出生 {{ dog.birth_date or '待补' }} ·
+        {{ age if age else dog_age(dog.birth_date) }} · {{ stage if stage else dog_stage(dog.birth_date) }}
+        {% if dog.weight_current %} · {{ dog.weight_current }} kg{% endif %}
+        {% if dstat != '在养' and dog.status_changed_at %} · 状态变更于 {{ dog.status_changed_at }}{% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="d-flex gap-2">
+    <button class="btn btn-outline-brand btn-sm"
+            data-dog='{{ {"id": dog.id, "name": dog.name, "status": dstat}|tojson }}'
+            onclick="openStatusModal(this)">改状态</button>
+    <a href="{{ url_for('dog_edit', did=dog.id) }}" class="btn btn-outline-secondary btn-sm">编辑档案</a>
+    <a href="{{ url_for('dogs') }}" class="btn btn-outline-secondary btn-sm">档案列表</a>
+  </div>
+</div>
+
+{% if dstat != '在养' %}
+<div class="alert alert-secondary py-2 small mb-3">
+  这只狗狗当前状态为「<b>{{ dstat }}</b>」，已不再参与喂养、免疫、训练提醒。
+  {% if dog.status_changed_at %}状态变更时间：{{ dog.status_changed_at }}。{% endif %}
+  历史记录仍可查看。
+</div>
+{% endif %}
+
+<ul class="nav nav-tabs mb-3">
+  <li class="nav-item"><a class="nav-link {{ 'active' if active=='today' }}" href="{{ url_for('dog_today', did=dog.id) }}">📋 今日待办</a></li>
+  <li class="nav-item"><a class="nav-link {{ 'active' if active=='records' }}" href="{{ url_for('dog_records', did=dog.id) }}">📒 记录管理</a></li>
+  <li class="nav-item"><a class="nav-link {{ 'active' if active=='diary' }}" href="{{ url_for('dog_diary', did=dog.id) }}">📖 狗狗日记</a></li>
+  <li class="nav-item"><a class="nav-link {{ 'active' if active=='expense' }}" href="{{ url_for('dog_expense', did=dog.id) }}">💰 记账</a></li>
+  <li class="nav-item"><a class="nav-link {{ 'active' if active=='train' }}" href="{{ url_for('dog_train', did=dog.id) }}">🎾 训练</a></li>
+  <li class="nav-item"><a class="nav-link {{ 'active' if active=='health' }}" href="{{ url_for('dog_health', did=dog.id) }}">🍚 饮食健康</a></li>
+  <li class="nav-item"><a class="nav-link {{ 'active' if active=='weekly' }}" href="{{ url_for('dog_weekly', did=dog.id) }}">📊 周报</a></li>
+  <li class="nav-item"><a class="nav-link {{ 'active' if active=='profile' }}" href="{{ url_for('dog_profile', did=dog.id) }}">🗂 档案与免疫</a></li>
+</ul>
+
+{% if alerts %}
+<div class="mb-3">
+  {% for a in alerts[:4] %}
+  <div class="alert-item {{ a.level }}">
+    <div class="t">{% if a.level == 'danger' %}❌{% else %}⚠️{% endif %} {{ a.title }}</div>
+    <div class="d">{{ a.detail }}</div>
+    <div class="a">👉 {{ a.action }}</div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
